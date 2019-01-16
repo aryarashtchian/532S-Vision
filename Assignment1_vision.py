@@ -98,3 +98,114 @@ for epoch in range(0, 400):
 
 
     if epoch % 10 == 0: print('epoch[%d] = %.8f' % (epoch, loss / dataset_size))
+
+
+# We will compute derivatives with respect to a single data pair (x,y)
+x = np.array([[2.34, 3.8, 34.44, 5.33]])
+y = np.array([[3.2, 4.2, 5.3]])
+
+# Define the operations.
+model = {}
+model['linear1'] = nn_Linear(4, hidden_state_size)
+model['linear2'] = nn_Linear(hidden_state_size, 3)
+model['sigmoid1'] = nn_Sigmoid()
+model['sigmoid2'] = nn_Sigmoid()
+model['loss'] = nn_MSECriterion()
+
+
+# Forward.
+a0 = model['linear1'].forward(xi)
+a1 = model['sigmoid1'].forward(a0)
+a2 = model['linear2'].forward(a1)
+a3 = model['sigmoid2'].forward(a2)
+loss += model['loss'].forward(a3, yi)
+
+# Backward.
+da3 = model['loss'].backward(a3, yi)
+da2 = model['sigmoid2'].backward(a2,da3)
+da1 = model['linear2'].backward(a1,da2)
+da0 = model['sigmoid1'].backward(a0, da1)
+model['linear1'].backward(xi, da0)
+
+gradWeight1 = model['linear1'].gradWeight
+gradBias1 = model['linear1'].gradBias
+
+gradWeight2 = model['linear2'].gradWeight
+gradBias2 = model['linear2'].gradBias
+
+
+approxGradWeight1 = np.zeros_like(model['linear1'].weight)
+approxGradWeight2 = np.zeros_like(model['linear2'].weight)
+
+
+# We will verify here that gradWeights are correct and leave it as an excercise
+# to verify the gradBias.
+epsilon = 0.0001
+
+for i in range(0, model['linear1'].weight.shape[0]):
+    for j in range(0, model['linear1'].weight.shape[1]):
+        # Compute f(w)
+        # Forward.
+        a0 = model['linear1'].forward(xi)
+        a1 = model['sigmoid1'].forward(a0)
+        a2 = model['linear2'].forward(a1)
+        a3 = model['sigmoid2'].forward(a2)
+        fw = model['loss'].forward(a3, yi)
+
+
+        # Compute f(w + eps)
+        shifted_weight = np.copy(model['linear1'].weight)
+        shifted_weight[i, j] = shifted_weight[i, j] + epsilon
+
+        shifted_linear = nn_Linear(4, 3)
+        shifted_linear.bias = model['linear1'].bias
+        shifted_linear.weight = shifted_weight
+
+        a0 = shifted_linear.forward(xi)
+        a1 = model['sigmoid1'].forward(a0)
+        a2 = model['linear2'].forward(a1)
+        a3 = model['sigmoid2'].forward(a2)
+        fw_epsilon = model['loss'].forward(a3, yi)
+
+        # Compute (f(w + eps) - f(w)) / eps
+        approxGradWeight1[i, j] = (fw_epsilon - fw) / epsilon
+
+# These two outputs should be similar up to some precision.
+print('gradWeight: ' + str(gradWeight1))
+print('\napproxGradWeight: ' + str(approxGradWeight1))
+
+
+for i in range(0, model['linear2'].weight.shape[0]):
+    for j in range(0, model['linear2'].weight.shape[1]):
+        # Compute f(w)
+        # Forward.
+        a0 = model['linear1'].forward(xi)
+        a1 = model['sigmoid1'].forward(a0)
+        a2 = model['linear2'].forward(a1)
+        a3 = model['sigmoid2'].forward(a2)
+        fw = model['loss'].forward(a3, yi)
+
+        print(fw)
+
+        # Compute f(w + eps)
+        shifted_weight = np.copy(model['linear2'].weight)
+        shifted_weight[i, j] = shifted_weight[i, j] + epsilon
+
+        shifted_linear = nn_Linear(4, 3)
+        shifted_linear.bias = model['linear2'].bias
+        shifted_linear.weight = shifted_weight
+
+        a0 = model['linear1'].forward(xi)
+        a1 = model['sigmoid1'].forward(a0)
+        a2 = shifted_linear.forward(a1)
+        a3 = model['sigmoid2'].forward(a2)
+        fw_epsilon = model['loss'].forward(a3, yi)
+
+        print(fw_epsilon)
+        print('------------------------')
+        # Compute (f(w + eps) - f(w)) / eps
+        approxGradWeight2[i, j] = (fw_epsilon - fw) / epsilon
+
+# These two outputs should be similar up to some precision.
+print('gradWeight: ' + str(gradWeight2))
+print('\napproxGradWeight: ' + str(approxGradWeight2))
